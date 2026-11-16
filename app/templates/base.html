@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token }}">
+<title>{% block title %}AANRSIP{% endblock %} · Recon Platform</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-page="{{ page|default('') }}" data-sid="{{ sid|default('') }}" data-address="{{ address|default('') }}" data-proto="{{ proto|default('') }}" data-port="{{ port|default('') }}">
+<header class="top">
+  <a class="brand" href="/"><span class="dot"></span>AANRSIP <small>adaptive network recon</small></a>
+  <nav>
+    <a href="/">Dashboard</a><a href="/scan/new">New scan</a><a href="/scans">History &amp; compare</a>
+  </nav>
+</header>
+<main>{% block body %}{% endblock %}</main>
+<footer>Authorised laboratory use only · all targets are scope-checked server-side</footer>
+<script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% block body %}
+<h1>New scan</h1>
+<form id="scanform" class="panel form">
+  <div class="grid3">
+    <label>Scan name<input name="name" value="Lab scan"></label>
+    <label>Target (IP or authorised CIDR)<input name="target" placeholder="192.168.56.10 or 10.0.0.0/28" required></label>
+    <label>Vantage label<input name="vantage" value="kali-main"></label>
+  </div>
+  <fieldset><legend>Discovery</legend>
+    <div class="grid3">
+      <label><input type="checkbox" name="tcp" checked> TCP</label>
+      <label><input type="checkbox" name="udp"> UDP</label>
+      <label>TCP mode<select name="tcp_mode"><option value="connect">connect (-sT)</option><option value="syn">SYN (-sS, needs privileges)</option></select></label>
+      <label>TCP ports<input name="tcp_ports" value="all" title="all | common | 22,80,9000-9100"></label>
+      <label>UDP ports<input name="udp_ports" value="commonudp" title="commonudp | all | list"></label>
+      <label>Backend<select name="backend"><option>auto</option><option>nmap</option><option>builtin</option></select></label>
+    </div></fieldset>
+  <fieldset><legend>Timing &amp; protection</legend>
+    <div class="grid3">
+      <label>Timing T0-T4<input type="number" name="timing" value="3" min="0" max="4"></label>
+      <label>Retries<input type="number" name="retries" value="1" min="0" max="5"></label>
+      <label>Probe timeout (s)<input type="number" name="probe_timeout" value="3" min="1" max="30"></label>
+      <label>Max rate (pkt/s)<input type="number" name="max_rate" value="1000" min="1" max="5000"></label>
+      <label>Delay per probe (ms)<input type="number" name="delay_ms" value="0" min="0" max="5000"></label>
+      <label>Block cooldown (s)<input type="number" name="cooldown_s" value="1200" min="0" max="3600"></label>
+    </div></fieldset>
+  <fieldset><legend>Investigation modules</legend>
+    <div class="grid3" id="mods">
+      <label><input type="checkbox" name="m" value="protocol_id" checked> Protocol identification</label>
+      <label><input type="checkbox" name="m" value="consistency" checked> Fingerprint validation</label>
+      <label><input type="checkbox" name="m" value="http" checked> HTTP investigation</label>
+      <label><input type="checkbox" name="m" value="tls" checked> TLS inspection</label>
+      <label><input type="checkbox" name="m" value="udp_probes" checked> UDP probes</label>
+      <label><input type="checkbox" name="service_detection" checked> nmap service detection (-sV)</label>
+      <label><input type="checkbox" name="os_detection"> OS detection (-O, needs privileges)</label>
+    </div>
+    <div class="grid3">
+      <label>HTTP paths (comma-separated)<input name="http_paths" value="/"></label>
+      <label>Virtual host (authorised hostname)<input name="vhost" placeholder="optional"></label>
+    </div></fieldset>
+  <fieldset><legend>Operator-supplied experiments (optional)</legend>
+    <div class="grid3">
+      <label>Knock sequence (ports, in order)<input name="knock_seq" placeholder="7000,8000,9000"></label>
+      <label>Protected port<input name="knock_port" type="number" placeholder="22"></label>
+      <label>Source ports to compare (max 5)<input name="source_ports" placeholder="53,88"></label>
+    </div>
+    <p class="hint">Knock sequences are replayed exactly as given, once. No guessing. Port sweeps may themselves touch knock ports.</p>
+  </fieldset>
+  <div class="row"><button type="button" id="review" class="btn">Review configuration</button></div>
+  <pre id="reviewout" class="code" hidden></pre>
+  <div class="row"><button id="start" class="btn primary" hidden>Start scan</button><span id="formerr" class="err"></span></div>
+</form>
+{% endblock %}

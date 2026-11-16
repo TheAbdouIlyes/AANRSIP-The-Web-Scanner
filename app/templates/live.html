@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block body %}
+<h1>Scan <span id="sname"></span> <span id="sstatus" class="badge"></span></h1>
+<section class="panel"><div id="stage" class="muted"></div><div class="bar"><div id="barfill"></div></div>
+<div id="counters" class="cards small"></div>
+<div class="row" id="controls"></div></section>
+<div class="grid2">
+<section class="panel"><h2>Hosts</h2><div id="hosts"></div><h2>Ports</h2><div id="ports"></div></section>
+<section class="panel"><h2>Investigation events</h2><div id="events" class="log"></div></section></div>
+<section class="panel"><h2>Findings</h2><div id="findings"></div>
+<p><a class="btn" href="/reports/{{ sid }}">Open report</a></p></section>
+{% endblock %}

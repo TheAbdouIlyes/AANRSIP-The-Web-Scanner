@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block body %}
+<h1>Service <span class="mono">{{ address }} {{ proto }}/{{ port }}</span></h1>
+<p><a href="/scans/{{ sid }}/hosts/{{ address }}">← host</a></p>
+<section class="panel" id="svc"></section>
+<section class="panel"><h2>Findings</h2><div id="svcfind"></div></section>
+<section class="panel"><h2>Investigation history (why each step ran)</h2><div id="inv"></div></section>
+{% endblock %}

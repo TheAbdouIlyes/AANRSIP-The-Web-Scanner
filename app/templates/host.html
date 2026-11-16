@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block body %}
+<h1>Host <span class="mono">{{ address }}</span></h1><p><a href="/scans/{{ sid }}">← scan {{ sid }}</a></p>
+<section class="panel" id="hostinfo"></section>
+<section class="panel"><h2>Ports &amp; service fingerprints</h2><div id="ports"></div></section>
+{% endblock %}

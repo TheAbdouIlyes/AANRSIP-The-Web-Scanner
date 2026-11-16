@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block body %}
+<h1>Report · scan {{ sid }}</h1>
+<div class="row"><a class="btn" href="/api/scans/{{ sid }}/report.json">JSON</a><a class="btn" href="/api/scans/{{ sid }}/report.csv">CSV</a><a class="btn" href="/api/scans/{{ sid }}/report.pdf">PDF</a></div>
+<div id="report"></div>
+{% endblock %}

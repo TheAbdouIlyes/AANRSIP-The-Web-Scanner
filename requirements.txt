@@ -1,0 +1,4 @@
+Flask>=3.0
+reportlab>=4.0
+cryptography>=42      # optional: full TLS certificate parsing
+pytest>=8.0           # tests only
