@@ -35,11 +35,11 @@ def test_rate_limit_from_resets():
 def test_blocking_suspected_then_confirmed_after_persistence():
     c = Clock()
     p = ScanProtection(clock=c, confirm_after_s=60)
-    p.record("h", "tcp", 9999, "refused")             # closed port that used to RST
+    p.record("h", "tcp", 9999, "refused")             # Baseline: the port refused.
     feed(p, ["ok"] * 12)
     for _ in range(4):
         feed(p, ["timeout"] * 4)
-    p.record("h", "tcp", 9999, "timeout")             # now silent
+    p.record("h", "tcp", 9999, "timeout")             # It later becomes silent.
     a = p.assess("h")
     assert a.level == "blocking_suspected" and any("previously-open" in i for i in a.indicators)
     c.t += 61

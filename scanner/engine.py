@@ -10,7 +10,8 @@ from .investigation import engine as inv_engine
 from .protocols import probes
 
 CHUNK = 1000
-BUILTIN_CHUNK = 250   # finer checkpoints for the built-in scanner
+# Smaller chunks let the built-in scanner save progress more often.
+BUILTIN_CHUNK = 250
 MAX_STORED_FILTERED = 500
 MAX_UDP_INVESTIGATE = 20
 
@@ -30,9 +31,10 @@ class ScanRunner(threading.Thread):
         self.use_nmap = nmap_runner.available() and cfg["backend"] in ("auto", "nmap")
         self.checkpoint = (store.get_scan(scan_id) or {}).get("checkpoint") or {}
         self.checkpoint.setdefault("hosts", {})
-        self.services = []   # collected for decoy comparison
+        # Keep service evidence for comparison after all hosts are scanned.
+        self.services = []
 
-    # ---- operator controls
+    # Operator controls.
     def pause(self):
         self.run_ev.clear()
         self.store.update_scan(self.id, status="paused")
@@ -67,10 +69,11 @@ class ScanRunner(threading.Thread):
         if self.throttle.delay_ms:
             time.sleep(self.throttle.delay_ms / 1000)
 
-    # ---- main
+    # Scan lifecycle.
     def run(self):
         s, sid = self.store, self.id
         try:
+            # Run the complete scan lifecycle in the background thread.
             s.update_scan(sid, status="running", stage="discovery", error=None)
             s.add_event(sid, "info", "start", f"Scan started on {self.spec} (backend={'nmap' if self.use_nmap else 'builtin'}, vantage={self.cfg['vantage']})")
             if not self.use_nmap and self.cfg["backend"] == "nmap":
@@ -96,7 +99,7 @@ class ScanRunner(threading.Thread):
             s.update_scan(sid, status="failed", stage="failed", error=f"{type(e).__name__}: {e}"[:400], finished=time.time())
             s.add_event(sid, "error", "failure", f"Scan failed: {type(e).__name__}: {e}"[:300])
 
-    # ---- discovery
+    # Host discovery.
     def discover(self):
         s, sid = self.store, self.id
         done = [h for h, v in self.checkpoint["hosts"].items()]
@@ -126,7 +129,7 @@ class ScanRunner(threading.Thread):
         s.add_event(sid, "info", "discovery", f"{len(up)} of {len(self.hosts)} addresses in scope responded; the rest are recorded as not reachable from vantage '{self.cfg['vantage']}'")
         return sorted(up, key=lambda a: ipaddress.ip_address(a))[: self.cfg["max_hosts"]]
 
-    # ---- per-host
+    # Per-host scanning.
     def scan_host(self, host, idx, total):
         s, sid, cfg = self.store, self.id, self.cfg
         base = idx / total
@@ -148,7 +151,7 @@ class ScanRunner(threading.Thread):
                 cp[f"{proto}_chunk"] = ci + 1
                 self._save_cp()
                 self.guard(host)
-        # service investigation
+        # Investigate services found on this host.
         s.update_scan(sid, stage=f"investigating services on {host}")
         rows = [p for p in s.ports(sid, host) if p["state"] == "open" or (p["proto"] == "udp" and p["state"] == "open|filtered")]
         rows = [p for p in rows if f"{p['proto']}/{p['port']}" not in cp.get("investigated", [])]
@@ -194,7 +197,7 @@ class ScanRunner(threading.Thread):
         if not self.use_nmap and not results:
             results = builtin.scan(host, proto, ports, self.cfg["probe_timeout"], delay_ms=self.throttle.delay_ms,
                                    on_outcome=self.protection.record, should_stop=self.cancel_ev.is_set, retries=cfg["retries"])
-        else:   # feed a bounded sample of outcomes to protection (nmap hides per-probe timing)
+        else:   # nmap does not expose each probe, so use a small sample.
             for p in results[:25]:
                 self.protection.record(host, proto, p["port"], p["outcome"])
         counts = {}
@@ -217,7 +220,8 @@ class ScanRunner(threading.Thread):
         if counts.get("filtered", 0) > stored_f:
             s.add_event(sid, "info", "ports", f"{counts['filtered'] - stored_f} further filtered ports on {host} not stored individually (summary only)")
         if self.cancel_ev.is_set():
-            raise Cancelled()   # partial chunk results were saved above; chunk stays un-checkpointed so resume redoes it
+            # Resume will repeat this chunk because it was not checkpointed.
+            raise Cancelled()
 
     def investigate_one(self, host, p):
         s, sid = self.store, self.id
@@ -239,7 +243,7 @@ class ScanRunner(threading.Thread):
             self.protection.record(host, "tcp", p["port"], outcome)
         self.services.append({"host": host, "proto": p["proto"], "port": p["port"], "obs": ctx.obs, "verdict": verdict, "ctx": ctx})
 
-    # ---- adaptive guard
+    # Adaptive protection.
     def guard(self, host):
         a = self.protection.assess(host)
         if a.level == "none":
@@ -266,7 +270,7 @@ class ScanRunner(threading.Thread):
         s.update_scan(sid, status="running", cooldown_until=None)
         s.add_event(sid, "info", "resume", "Operator released the cooldown pause; resuming")
 
-    # ---- experiments (explicitly operator configured)
+    # Operator-configured experiments.
     def knock_experiment(self, host):
         k, s, sid = self.cfg["knock"], self.store, self.id
         t = self.cfg["probe_timeout"]
@@ -307,7 +311,7 @@ class ScanRunner(threading.Thread):
                 s.add_finding(sid, host, "tcp", r["port"], "source_port", "observed", "medium",
                               f"Port {r['port']} is {r['default_source']} normally but {r['with_source_port']} from source port {r['source_port']}", r)
 
-    # ---- findings
+    # Finding generation.
     def host_findings(self, host):
         s, sid = self.store, self.id
         fam = ipaddress.ip_address(host).version

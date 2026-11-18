@@ -57,6 +57,7 @@ def scans():
 
 @bp.route("/scans", methods=["POST"])
 def start_scan():
+    # ScanManager validates, saves, and starts the scan.
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("JSON body required")

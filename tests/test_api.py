@@ -61,7 +61,7 @@ def test_scan_lifecycle_and_exports(client, lab):
     assert client.get(f"/api/scans/{sid}/report.exe").status_code == 404
     assert client.get(f"/api/compare?a={sid}&b={sid}").status_code == 200
     assert client.get("/api/stats").get_json()["open_tcp"] >= 1
-    assert post(client, f"/api/scans/{sid}/control", {"action": "cancel"}).status_code == 400   # not running anymore
+    assert post(client, f"/api/scans/{sid}/control", {"action": "cancel"}).status_code == 400   # The scan already stopped.
 
 
 def test_remote_clients_and_token_auth(tmp_path):

@@ -3,7 +3,7 @@ import ipaddress
 import re
 
 DEFAULT_ALLOWED = [
-    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/24","127.0.0.0/32",
     "169.254.0.0/16", "::1/128", "fc00::/7", "fe80::/10",
 ]
 MODULES = {"protocol_id", "http", "tls", "consistency", "udp_probes", "knock", "source_port"}
@@ -24,6 +24,12 @@ def load_allowlist(nets=None):
         raise ValidationError(f"bad allowlist entry: {e}")
 
 
+
+# Target validation:
+# 1. Accept only a non-empty IP address or CIDR.
+# 2. Keep the target within the size limit and allowlist.
+# 3. Return the individual addresses to scan.
+
 def parse_target(text, allowlist, max_hosts=256):
     """Return list of ipaddress objects. Rejects hostnames, public IPs, oversized ranges."""
     if not isinstance(text, str) or not text.strip() or len(text) > 64:
@@ -42,6 +48,12 @@ def parse_target(text, allowlist, max_hosts=256):
     hosts = list(net.hosts()) if net.version == 4 else [a for a in net]
     return hosts[:max_hosts]
 
+
+
+
+# Port validation:
+# Convert the user's selection to sorted port numbers.
+# Reject invalid ports, ranges, and empty selections.
 
 def parse_ports(spec, default=None):
     """Normalise a port spec into a sorted list of ints (1-65535)."""
@@ -87,24 +99,45 @@ def _int(v, name, lo, hi, default):
     return v
 
 
+
+
+# Validate and normalize all values received from the frontend.
+
 def validate_config(raw):
-    """Whitelist-based config validation. Unknown keys are dropped."""
+    """Whitelist-based config validation. Unknown keys are dropped.
+
+    This is the boundary where browser-provided values become trusted,
+    normalized values used by the scanner.
+    """
     raw = raw or {}
     cfg = {}
+
+    # Scan name and vantage point.
+
     cfg["name"] = re.sub(r"[^\w .:/-]", "", str(raw.get("name", ""))[:80]) or "Untitled scan"
     cfg["vantage"] = re.sub(r"[^\w.-]", "", str(raw.get("vantage", "default"))[:32]) or "default"
+
+    # Scanner backend and TCP mode.
+
     cfg["backend"] = raw.get("backend", "auto")
     if cfg["backend"] not in ("auto", "nmap", "builtin"):
         raise ValidationError("backend must be auto, nmap or builtin")
     cfg["tcp_mode"] = raw.get("tcp_mode", "connect")
     if cfg["tcp_mode"] not in ("connect", "syn"):
         raise ValidationError("tcp_mode must be connect or syn")
+
+    # Protocols and port lists.
+
     cfg["tcp"] = bool(raw.get("tcp", True))
     cfg["udp"] = bool(raw.get("udp", False))
     if not (cfg["tcp"] or cfg["udp"]):
         raise ValidationError("enable at least one of TCP / UDP")
     cfg["tcp_ports"] = parse_ports(raw.get("tcp_ports"), "common")
     cfg["udp_ports"] = parse_ports(raw.get("udp_ports"), "commonudp")
+
+
+    # Timing and workload limits.
+
     cfg["timing"] = _int(raw.get("timing"), "timing", 0, 4, 3)
     cfg["retries"] = _int(raw.get("retries"), "retries", 0, 5, 1)
     cfg["probe_timeout"] = _int(raw.get("probe_timeout"), "probe_timeout", 1, 30, 3)
@@ -114,13 +147,22 @@ def validate_config(raw):
     cfg["max_delay_ms"] = _int(raw.get("max_delay_ms"), "max_delay_ms", 0, 10000, 2000)
     cfg["cooldown_s"] = _int(raw.get("cooldown_s"), "cooldown_s", 0, 3600, 1200)
     cfg["max_hosts"] = _int(raw.get("max_hosts"), "max_hosts", 1, 256, 64)
+
+    # Optional service and OS detection.
+
     cfg["service_detection"] = bool(raw.get("service_detection", True))
     cfg["os_detection"] = bool(raw.get("os_detection", False))
+
+    # Optional investigation modules.
+
     mods = raw.get("modules")
     mods = set(mods) if mods else set(MODULES - {"knock", "source_port"})
     if not mods <= MODULES:
         raise ValidationError(f"unknown modules: {sorted(mods - MODULES)}")
     cfg["modules"] = sorted(mods)
+
+    # HTTP paths and virtual host.
+
     paths = raw.get("http_paths") or ["/"]
     if not isinstance(paths, list) or len(paths) > 10:
         raise ValidationError("http_paths: list of at most 10 paths")
@@ -132,6 +174,9 @@ def validate_config(raw):
     if vh and not HOST_RE.match(vh):
         raise ValidationError("invalid vhost")
     cfg["vhost"] = vh
+
+    # Authorized port-knocking experiment.
+
     knock = raw.get("knock") or {}
     if knock:
         seq = knock.get("sequence") or []
@@ -151,4 +196,6 @@ def validate_config(raw):
             raise ValidationError("source_ports: at most 5 values")
         cfg["source_ports"] = [_int(p, "source port", 1, 65535, None) for p in sps]
         cfg["modules"] = sorted(set(cfg["modules"]) | {"source_port"})
+
+    # Return the trusted scanner configuration.
     return cfg

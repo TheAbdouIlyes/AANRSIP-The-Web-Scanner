@@ -21,9 +21,9 @@ class Assessment:
 class ScanProtection:
     def __init__(self, window=15, confirm_after_s=60, clock=time.time, known_open=None, known_closed=None):
         self.window, self.confirm_after_s, self.clock = window, confirm_after_s, clock
-        self.history = {}                      # host -> deque of (ts, proto, port, outcome)
-        self.baseline = {}                     # (host,proto,port) -> first non-timeout outcome seen
-        self.known_open = {h: set(v) for h, v in (known_open or {}).items()}   # from earlier scan/earlier in this one
+        self.history = {}                      # host -> recent probe outcomes
+        self.baseline = {}                     # first non-timeout result per port
+        self.known_open = {h: set(v) for h, v in (known_open or {}).items()}   # results from earlier scans
         self.known_closed = {h: set(v) for h, v in (known_closed or {}).items()}
         self.suspected_since = {}
 
@@ -54,7 +54,7 @@ class ScanProtection:
             rate_ind.append(f"timeout rate rose from {t_early:.0%} to {t_recent:.0%} over the last {len(recent)} probes")
         if r_recent >= 0.3:
             rate_ind.append(f"{r_recent:.0%} of recent probes were reset")
-        # canaries: ports that previously answered 'open' now silent
+        # Check whether previously open ports have become unreachable.
         last = {}
         for _, proto, port, outcome in dq:
             last[(proto, port)] = outcome
@@ -64,7 +64,7 @@ class ScanProtection:
         strong = False
         if len(dead) >= 2 or (len(dead) >= 1 and len(self.known_open.get(host, ())) == 1):
             block_ind.append(f"{len(dead)} previously-open service(s) now unreachable: " + ", ".join(f"{a}/{b}" for a, b in sorted(dead)[:6]))
-        # closed ports that used to RST now silent -> a filter appeared in the path
+        # A refused port that now times out may have gained a filter.
         flipped = [p for p, o in last.items() if self.baseline.get((host, *p)) == "refused" and o == "timeout"]
         if flipped:
             block_ind.append(f"{len(flipped)} port(s) that previously refused now time out (filter inserted?)")

@@ -1,4 +1,4 @@
-/* Front end. Every value from the API is inserted with textContent (never innerHTML): scan output is untrusted. */
+/* Render API values as text because scan output is untrusted. */
 (() => {
 const $ = (s, r = document) => r.querySelector(s);
 const B = document.body.dataset;
@@ -14,6 +14,7 @@ function h(tag, attrs, ...kids) {
 }
 const clear = (el) => { el.replaceChildren(); return el; };
 async function api(path, opts = {}) {
+  // Keep JSON encoding, CSRF headers, and API error handling in one place.
   const o = { method: opts.method || 'GET', headers: {} };
   if (opts.body !== undefined) { o.body = JSON.stringify(opts.body); o.headers['Content-Type'] = 'application/json'; }
   if (o.method !== 'GET') o.headers['X-CSRF-Token'] = csrf();
@@ -46,6 +47,7 @@ async dashboard() {
 new() {
   const f = $('#scanform');
   const build = () => {
+    // Convert form strings and checkbox state into the API's scan/config shape.
     const g = (n) => f.elements[n];
     const num = (n) => g(n).value === '' ? undefined : Number(g(n).value);
     const list = (n) => g(n).value.split(',').map(x => x.trim()).filter(Boolean).map(Number);

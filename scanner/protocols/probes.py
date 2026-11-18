@@ -274,7 +274,8 @@ def classify_udp(name, data):
         return "dns"
     if name == "ntp" and len(data) >= 48 and (data[0] & 0x07) in (4, 5):
         return "ntp"
-    return None   # a reply we cannot attribute to a protocol is evidence of activity, not a protocol
+    # Unknown replies prove activity, but not a specific protocol.
+    return None
 
 
 def identify_udp(addr, port, timeout=2):

@@ -12,7 +12,7 @@ class ScanManager:
         self.store, self.allowlist, self.max_concurrent, self.max_hosts = store, load_allowlist(allowlist), max_concurrent, max_hosts
         self.runners = {}
         self.lock = threading.Lock()
-        # anything left 'running' from a previous process was interrupted: results are preserved
+        # Mark unfinished scans so their saved results can be resumed.
         for s in self.store.query("SELECT id FROM scans WHERE status IN ('running','paused','paused_blocking','queued')"):
             self.store.update_scan(s["id"], status="interrupted", stage="interrupted")
             self.store.add_event(s["id"], "warning", "interrupt", "Application restarted while scan was active; partial results preserved, resume is possible")
@@ -36,13 +36,16 @@ class ScanManager:
         with self.lock:
             if len(self._active()) >= self.max_concurrent:
                 raise ValidationError(f"at most {self.max_concurrent} concurrent scans")
+                
+            # Validate everything before saving or starting network activity.
             cfg = validate_config(raw_cfg)
             hosts = parse_target(target, self.allowlist, self.max_hosts)
             sid = self.store.create_scan(cfg["name"], target.strip(), cfg)
             return self._launch(sid, cfg, hosts, target.strip())
 
     def _launch(self, sid, cfg, hosts, target):
-        self.store.update_scan(sid, status="queued", stage="queued", finished=None)   # visible immediately: no stale 'cancelled'
+        # Show the queued state before the worker thread starts.
+        self.store.update_scan(sid, status="queued", stage="queued", finished=None)
         po, pc = self._prior(target, cfg["vantage"], sid)
         r = ScanRunner(self.store, sid, cfg, hosts, target, po, pc)
         self.runners[sid] = r
@@ -56,7 +59,8 @@ class ScanManager:
                 raise ValidationError("only cancelled, interrupted or failed scans can be resumed from checkpoint")
             if len(self._active()) >= self.max_concurrent:
                 raise ValidationError("too many concurrent scans")
-            hosts = parse_target(s["target"], self.allowlist, self.max_hosts)   # scope is re-validated on resume
+            # Check the target again because the allowlist may have changed.
+            hosts = parse_target(s["target"], self.allowlist, self.max_hosts)
             self.store.add_event(sid, "info", "resume", "Resuming from checkpoint; completed hosts/chunks are skipped")
             return self._launch(sid, s["config"], hosts, s["target"])
 

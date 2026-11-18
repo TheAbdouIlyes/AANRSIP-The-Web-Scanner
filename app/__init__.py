@@ -77,7 +77,6 @@ def create_app(test_config=None):
 
     return app
 
-
 def _persisted_secret():
     path = os.path.join(ROOT, "config", ".secret_key")
     if os.path.exists(path):

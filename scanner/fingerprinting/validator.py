@@ -21,7 +21,8 @@ def validate(claim, claim_method, obs, protocol_checks=None):
     seen = observed_protocols(obs)
     evidence, issues = [], []
     claim = (claim or "").lower().replace("ssl/", "").replace("http-alt", "http").replace("https", "http")
-    weak_claim = claim_method in WEAK_METHODS  # port-number table guess, not a measured fact
+    # A port table is only a guess, so it cannot confirm a service.
+    weak_claim = claim_method in WEAK_METHODS
     tcp = "tls_handshake" in obs.get("probes", {})
     banner = obs.get("probes", {}).get("banner", {})
     if banner.get("proto"):
@@ -41,7 +42,7 @@ def validate(claim, claim_method, obs, protocol_checks=None):
     primary = max(seen, key=lambda k: len(seen[k]))
     if banner.get("proto"):
         primary = banner["proto"]
-    # Normalise tls-wrapped http
+    # Treat HTTPS responses as HTTP carried inside TLS.
     if "tls" in seen and "http" in seen and "https_get" in seen.get("http", []):
         primary = "http"
 
@@ -52,7 +53,7 @@ def validate(claim, claim_method, obs, protocol_checks=None):
         issues.append(f"claimed service {claim!r} but observed {sorted(seen)}")
     if banner.get("proto") and banner["proto"] != primary:
         issues.append(f"banner says {banner['proto']} but behaviour is {primary}")
-    # banner says X, but a different protocol answered a probe
+    # Flag a banner that conflicts with another observed protocol.
     if banner.get("proto") and any(p not in (banner["proto"], "tls") for p in seen):
         other = sorted(p for p in seen if p not in (banner["proto"], "tls"))
         issues.append(f"banner claims {banner['proto']} yet port also answers as {other}")
@@ -79,12 +80,12 @@ def decoy_indicators(per_service):
         key = (s["host"], s["proto"], s["port"])
         probes = s["obs"].get("probes", {})
         nonempty = [p for p in probes.values() if p.get("len")]
-        # (a) identical bytes returned for different probe types
+        # Same bytes for different probes can indicate a decoy.
         hashes = Counter(p["hash"] for p in nonempty if p["hash"])
         if hashes and hashes.most_common(1)[0][1] >= 3:
             out[key]["indicators"].append(f"identical response bytes for {hashes.most_common(1)[0][1]} different probes")
             out[key]["strength"] += 1
-        # (b) answers as several unrelated protocols
+        # Several unrelated protocols on one port are suspicious.
         protos = {p["proto"] for p in probes.values() if p.get("proto")} - {"tls"}
         if len(protos) >= 2:
             out[key]["indicators"].append(f"answers as multiple protocols: {sorted(protos)}")
@@ -92,7 +93,7 @@ def decoy_indicators(per_service):
         b = probes.get("banner", {})
         if b.get("hash"):
             banner_hash[b["hash"]].append(key)
-    # (c) same banner reused on several ports/hosts
+    # Reusing one banner across services is another decoy signal.
     for h, keys in banner_hash.items():
         if len(keys) >= 3:
             for k in keys:

@@ -79,7 +79,7 @@ def to_csv(rep):
     for p in rep["ports"]:
         row = [p["host"], p["proto"], p["port"], p["state"], p["reason"], p["service"], p["product"], p["version"],
                p.get("verdict") or "", p.get("confidence") or "", p.get("banner") or ""]
-        # neutralise spreadsheet formula injection from remote-controlled strings
+        # Prevent remote values from being executed as spreadsheet formulas.
         w.writerow([("'" + c) if isinstance(c, str) and c[:1] in "=+-@" else c for c in row])
     return out.getvalue()
 

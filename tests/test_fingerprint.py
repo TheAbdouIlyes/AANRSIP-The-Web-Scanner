@@ -31,7 +31,7 @@ def test_claim_vs_behaviour_mismatch():
 
 
 def test_weak_table_claim_not_used_against_service():
-    # nmap name from the port table (method=table) must not create an 'inconsistency' on its own
+    # A port-table guess alone must not create an inconsistency.
     obs = {"probes": {"http_get": P("http", "b"), "crlf": P("http", "c")}}
     v = validate("modbus", "table", obs)
     assert v["status"] != "inconsistent"

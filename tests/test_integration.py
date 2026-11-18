@@ -34,11 +34,11 @@ def test_misleading_banner_detected(lab):
 def test_udp_service_identified_and_silence_is_open_filtered(lab):
     obs = probes.identify_udp(H, lab.ports["udp_dns"], 1)
     assert obs["probes"]["dns"]["proto"] == "dns"
-    # the generic sweep probe gets no reply from a DNS server on an arbitrary port: honest answer is open|filtered
+    # No generic reply means open|filtered, not closed.
     assert builtin.udp_probe(H, lab.ports["udp_dns"], 1)[0] == "open|filtered"
-    # ...and the protocol-specific ladder is what resolves the ambiguity
+    # Protocol-specific probes resolve that ambiguity.
     assert any(p["proto"] == "dns" for p in obs["probes"].values())
-    # a port nobody answers on: no ICMP unreachable on a fresh bound-but-silent socket -> open|filtered
+    # A silent UDP socket without ICMP is also open|filtered.
     import socket
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind((H, 0))
     assert builtin.udp_probe(H, s.getsockname()[1], 0.5)[0] == "open|filtered"
@@ -47,7 +47,7 @@ def test_udp_service_identified_and_silence_is_open_filtered(lab):
 
 def test_rate_limited_service_resets(lab):
     outs = [builtin.tcp_probe(H, lab.ports["ratelimited"], 1)[2] for _ in range(20)]
-    # open (banner accepted) first, then RST behaviour appears; either way never mistaken for 'closed'
+    # A reset after an accepted banner is not treated as closed.
     assert "ok" in outs and ("reset" in outs or "refused" in outs or outs.count("ok") == 20)
     assert "refused" not in outs
 
@@ -122,7 +122,7 @@ def test_compare_explains_simultaneous_state_change(store):
     assert len(d["changes"]) == 2
     n = d["notes"][0]
     assert "open -> filtered together" in n["observed"] and "firewall" in n["probable"]
-    assert any("did not" in x for x in n["hypotheses"])     # 9000 stayed open: blocking is a weaker hypothesis
+    assert any("did not" in x for x in n["hypotheses"])     # Blocking remains only a hypothesis.
 
 
 def test_block_detection_pauses_and_requires_operator(store):
@@ -137,7 +137,7 @@ def test_block_detection_pauses_and_requires_operator(store):
     t = threading.Thread(target=r.guard, args=(H,)); t.start()
     time.sleep(0.8)
     s = store.get_scan(sid)
-    assert s["status"] == "paused_blocking" and t.is_alive()          # does NOT auto-resume, no evasion
+    assert s["status"] == "paused_blocking" and t.is_alive()          # It pauses; it never evades the block.
     ev = store.query("SELECT message FROM events WHERE scan_id=? AND kind='blocking'", (sid,))
     assert ev and "No evasion" in ev[0]["message"]
     r.release_block(); t.join(3)

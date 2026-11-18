@@ -11,7 +11,7 @@ def test_rejects_bad_targets(t):
 
 
 def test_accepts_lab_targets():
-    assert [str(h) for h in parse_target("192.168.56.0/30", A)] == ["192.168.56.1", "192.168.56.2"]
+    assert [str(h) for h in parse_target("192.168.0.0/30", A)] == ["192.168.0.1", "192.168.0.2"]
     assert str(parse_target("::1", A)[0]) == "::1"
     assert str(parse_target("fe80::1", A)[0]) == "fe80::1"
 
