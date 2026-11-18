@@ -5,6 +5,9 @@ it enumerates ports independent of defaults, identifies services by *behaviour*,
 observed protocol responses, adapts its investigations to earlier results (and records *why*), and backs off when it
 sees signs of rate limiting or blocking. It never evades blocks.
 
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/9c763a49-416a-4e03-ba41-139f570b071d" />
+
+
 ## Layout
 ```
 app/            Flask: auth, CSRF, security headers, pages (templates/static), JSON API (routes/api.py)
